@@ -17,6 +17,7 @@ preprocess_data: True
 copy_data: True
 
 exp_name: null # a random experiment name will be generated if not provided
+seed: null # random seed for reproducibility
 
 # settings for code execution
 exec:
@@ -43,7 +44,7 @@ agent:
 
   # LLM settings for coding
   code:
-    model: gpt-4-turbo
+    model: o1-preview
     temp: 0.5
 
   # LLM settings for evaluating program output / tracebacks

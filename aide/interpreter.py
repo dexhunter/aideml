@@ -174,6 +174,8 @@ class Interpreter:
     def cleanup_session(self):
         if self.process is None:
             return
+        # Existing cleanup code
+        self.cleanup_joblib_resources()
         # give the child process a chance to terminate gracefully
         self.process.terminate()
         self.process.join(timeout=2)
@@ -288,3 +290,15 @@ class Interpreter:
                 f"Execution time: {humanize.naturaldelta(exec_time)} seconds (time limit is {humanize.naturaldelta(self.timeout)})."
             )
         return ExecutionResult(output, exec_time, e_cls_name, exc_info, exc_stack)
+
+    def cleanup_joblib_resources(self):
+        """Clean up any joblib resources before shutdown"""
+        import joblib
+        # Clear temporary folders created by joblib
+        if hasattr(joblib.pool, 'MemmappingPool'):
+            pool_cls = getattr(joblib.pool, 'MemmappingPool')
+            if hasattr(pool_cls, '_temp_folder_manager'):
+                try:
+                    pool_cls._temp_folder_manager.clear()
+                except Exception as e:
+                    logger.warning(f"Failed to clear joblib memory pools: {e}")

@@ -1,6 +1,9 @@
 import atexit
 import logging
 import shutil
+import random
+import numpy as np
+import torch
 
 from . import backend
 
@@ -57,6 +60,13 @@ def run():
     cfg = load_cfg()
     logger.info(f'Starting run "{cfg.exp_name}"')
 
+    if cfg.seed is not None:
+        random.seed(cfg.seed)
+        np.random.seed(cfg.seed)
+        torch.manual_seed(cfg.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(cfg.seed)
+
     task_desc = load_task_desc(cfg)
     task_desc_str = backend.compile_prompt_to_md(task_desc)
 
@@ -66,6 +76,8 @@ def run():
     def cleanup():
         if global_step == 0:
             shutil.rmtree(cfg.workspace_dir)
+        # Add joblib cleanup
+        interpreter.cleanup_joblib_resources()
     atexit.register(cleanup)
 
     journal = Journal()

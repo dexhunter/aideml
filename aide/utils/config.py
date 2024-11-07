@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Hashable, cast
+import shutil
 
 import coolname
 import rich
@@ -73,6 +74,7 @@ class Config(Hashable):
     copy_data: bool
 
     exp_name: str
+    seed: int | None
 
     exec: ExecConfig
     generate_report: bool
@@ -167,6 +169,11 @@ def load_task_desc(cfg: Config):
 
 def prep_agent_workspace(cfg: Config):
     """Setup the agent's workspace and preprocess data if necessary."""
+    # First remove existing workspace if it exists
+    if cfg.workspace_dir.exists():
+        shutil.rmtree(cfg.workspace_dir)
+    
+    # Create fresh directories
     (cfg.workspace_dir / "input").mkdir(parents=True, exist_ok=True)
     (cfg.workspace_dir / "working").mkdir(parents=True, exist_ok=True)
 
