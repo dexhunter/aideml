@@ -92,3 +92,4 @@ xlrd
 backoff
 streamlit==1.40.2
 python-dotenv
+ray[default]==2.40.0

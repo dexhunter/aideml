@@ -38,6 +38,12 @@ class SearchConfig:
     debug_prob: float
     num_drafts: int
 
+@dataclass
+class ParallelConfig:
+    enabled: bool
+    num_workers: int
+    nodes_per_worker: int
+
 
 @dataclass
 class AgentConfig:
@@ -50,6 +56,8 @@ class AgentConfig:
     feedback: StageConfig
 
     search: SearchConfig
+
+    parallel: ParallelConfig
 
 
 @dataclass

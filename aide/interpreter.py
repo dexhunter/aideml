@@ -49,11 +49,7 @@ def exception_summary(e, working_dir, exec_file_name, format_tb_ipython):
         tb_lines = traceback.format_exception(e)
         # skip parts of stack trace in weflow code
         tb_str = "".join(
-            [
-                line
-                for line in tb_lines
-                if "aide/" not in line and "importlib" not in line
-            ]
+            [l for l in tb_lines if "aide/" not in l and "importlib" not in l]
         )
         # tb_str = "".join([l for l in tb_lines])
 
@@ -203,7 +199,7 @@ class Interpreter:
 
         """
 
-        logger.debug(f"REPL is executing code (reset_session={reset_session})")
+        logger.info(f"REPL is executing code (reset_session={reset_session})")
 
         if reset_session:
             if self.process is not None:
@@ -224,9 +220,18 @@ class Interpreter:
         except queue.Empty:
             msg = "REPL child process failed to start execution"
             logger.critical(msg)
+            queue_dump = ""
             while not self.result_outq.empty():
-                logger.error(f"REPL output queue dump: {self.result_outq.get()}")
-            raise RuntimeError(msg) from None
+                queue_dump = self.result_outq.get()
+                logger.error(f"REPL output queue dump: {queue_dump[:1000]}")
+            self.cleanup_session()
+            return ExecutionResult(
+                term_out=[msg, queue_dump],
+                exec_time=0,
+                exc_type="RuntimeError",
+                exc_info={},
+                exc_stack=[],
+            )
         assert state[0] == "state:ready", state
         start_time = time.time()
 
@@ -246,11 +251,18 @@ class Interpreter:
                 if not child_in_overtime and not self.process.is_alive():
                     msg = "REPL child process died unexpectedly"
                     logger.critical(msg)
+                    queue_dump = ""
                     while not self.result_outq.empty():
-                        logger.error(
-                            f"REPL output queue dump: {self.result_outq.get()}"
-                        )
-                    raise RuntimeError(msg) from None
+                        queue_dump = self.result_outq.get()
+                        logger.error(f"REPL output queue dump: {queue_dump[:1000]}")
+                    self.cleanup_session()
+                    return ExecutionResult(
+                        term_out=[msg, queue_dump],
+                        exec_time=0,
+                        exc_type="RuntimeError",
+                        exc_info={},
+                        exc_stack=[],
+                    )
 
                 # child is alive and still executing -> check if we should sigint..
                 if self.timeout is None:

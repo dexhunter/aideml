@@ -12,6 +12,7 @@ from .utils.config import (
     _load_cfg,
     prep_cfg,
 )
+from .parallel_agent import ParallelAgent
 
 
 @dataclass
@@ -43,11 +44,18 @@ class Experiment:
             prep_agent_workspace(self.cfg)
 
         self.journal = Journal()
-        self.agent = Agent(
-            task_desc=self.task_desc,
-            cfg=self.cfg,
-            journal=self.journal,
-        )
+        if self.cfg.agent.parallel.enabled:
+            self.agent = ParallelAgent(
+                task_desc=self.task_desc,
+                cfg=self.cfg,
+                journal=self.journal,
+            )
+        else:
+            self.agent = Agent(
+                task_desc=self.task_desc,
+                cfg=self.cfg,
+                journal=self.journal,
+            )
         self.interpreter = Interpreter(
             self.cfg.workspace_dir, **OmegaConf.to_container(self.cfg.exec)  # type: ignore
         )
@@ -60,3 +68,10 @@ class Experiment:
 
         best_node = self.journal.get_best_node(only_good=False)
         return Solution(code=best_node.code, valid_metric=best_node.metric.value)
+
+    def cleanup(self):
+        """Cleanup resources"""
+        if hasattr(self, 'interpreter'):
+            self.interpreter.cleanup_session()
+        if isinstance(self.agent, ParallelAgent):
+            self.agent.cleanup()

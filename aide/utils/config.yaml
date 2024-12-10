@@ -56,3 +56,8 @@ agent:
     max_debug_depth: 3
     debug_prob: 0.5
     num_drafts: 5
+  
+  parallel:
+    enabled: true
+    num_workers: 4
+    nodes_per_worker: 2

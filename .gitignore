@@ -168,3 +168,6 @@ logs
 
 .gradio/
 .ruff_cache/
+
+run.sh
+run_experiments.sh

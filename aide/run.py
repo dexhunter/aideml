@@ -5,6 +5,7 @@ import shutil
 from . import backend
 
 from .agent import Agent
+from .parallel_agent import ParallelAgent
 from .interpreter import Interpreter
 from .journal import Journal, Node
 from .journal2report import journal2report
@@ -63,6 +64,8 @@ def run():
     with Status("Preparing agent workspace (copying and extracting files) ..."):
         prep_agent_workspace(cfg)
 
+    global_step = 0
+
     def cleanup():
         if global_step == 0:
             shutil.rmtree(cfg.workspace_dir)
@@ -70,14 +73,26 @@ def run():
     atexit.register(cleanup)
 
     journal = Journal()
-    agent = Agent(
-        task_desc=task_desc,
-        cfg=cfg,
-        journal=journal,
-    )
-    interpreter = Interpreter(
-        cfg.workspace_dir, **OmegaConf.to_container(cfg.exec)  # type: ignore
-    )
+    
+    # Choose agent type based on config
+    if cfg.agent.parallel.enabled:
+        agent = ParallelAgent(
+            task_desc=task_desc,
+            cfg=cfg,
+            journal=journal,
+        )
+        # No need for separate interpreter as each worker has its own
+        exec_callback = None
+    else:
+        agent = Agent(
+            task_desc=task_desc,
+            cfg=cfg,
+            journal=journal,
+        )
+        interpreter = Interpreter(
+            cfg.workspace_dir, **OmegaConf.to_container(cfg.exec)  # type: ignore
+        )
+        exec_callback = interpreter.run
 
     global_step = len(journal)
     prog = Progress(
@@ -88,12 +103,6 @@ def run():
     )
     status = Status("[green]Generating code...")
     prog.add_task("Progress:", total=cfg.agent.steps, completed=global_step)
-
-    def exec_callback(*args, **kwargs):
-        status.update("[magenta]Executing code...")
-        res = interpreter.run(*args, **kwargs)
-        status.update("[green]Generating code...")
-        return res
 
     def generate_live():
         tree = journal_to_rich_tree(journal)
@@ -127,12 +136,23 @@ def run():
         refresh_per_second=16,
         screen=True,
     ) as live:
-        while global_step < cfg.agent.steps:
-            agent.step(exec_callback=exec_callback)
-            save_run(cfg, journal)
-            global_step = len(journal)
-            live.update(generate_live())
-    interpreter.cleanup_session()
+        try:
+            while global_step < cfg.agent.steps:
+                if cfg.agent.parallel.enabled:
+                    status.update("[magenta]Generating and executing code in parallel...")
+                    agent.step()
+                else:
+                    status.update("[green]Generating code...")
+                    agent.step(exec_callback=exec_callback)
+                    save_run(cfg, journal)
+                global_step = len(journal)
+                live.update(generate_live())
+        finally:
+            # Cleanup resources
+            if cfg.agent.parallel.enabled:
+                agent.cleanup()
+            else:
+                interpreter.cleanup_session()
 
     if cfg.generate_report:
         print("Generating final report from journal...")
